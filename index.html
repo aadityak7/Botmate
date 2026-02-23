@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BotMate - Chess Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .game-layout {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 30px;
+            align-items: start;
+        }
+
+        .board-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .chessboard {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 0;
+            border: 3px solid #333;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1;
+        }
+
+        .square {
+            aspect-ratio: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(30px, 5vw, 50px);
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .square.light {
+            background-color: #f0d9b5;
+        }
+
+        .square.dark {
+            background-color: #b58863;
+        }
+
+        .square.selected {
+            background-color: #829769 !important;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .square.legal-move {
+            position: relative;
+        }
+
+        .square.legal-move::after {
+            content: '';
+            position: absolute;
+            width: 30%;
+            height: 30%;
+            background-color: rgba(0, 255, 0, 0.5);
+            border-radius: 50%;
+        }
+
+        .square.legal-move.has-piece::after {
+            width: 90%;
+            height: 90%;
+            background-color: rgba(255, 0, 0, 0.3);
+            border: 3px solid rgba(255, 0, 0, 0.6);
+        }
+
+        .sidebar {
+            background: #f7f7f7;
+            padding: 20px;
+            border-radius: 15px;
+        }
+
+        .mode-selector {
+            margin-bottom: 20px;
+        }
+
+        .mode-selector h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .mode-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .mode-btn {
+            background: #667eea;
+            color: white;
+        }
+
+        .mode-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .mode-btn.active {
+            background: #764ba2;
+        }
+
+        .reset-btn {
+            background: #e74c3c;
+            color: white;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .reset-btn:hover {
+            background: #c0392b;
+        }
+
+        .game-info {
+            margin-top: 20px;
+        }
+
+        .info-section {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .info-section h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .info-section p {
+            color: #666;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+
+        .status {
+            font-weight: bold;
+            color: #764ba2;
+        }
+
+        .elo-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .elo-item {
+            text-align: center;
+        }
+
+        .elo-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .elo-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+        }
+
+        .move-history {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .thinking {
+            color: #e67e22;
+            font-style: italic;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @media (max-width: 768px) {
+            .game-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .container {
+                padding: 15px;
+            }
+        }
+
+        .game-over-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .modal-content h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .modal-content p {
+            margin: 10px 0;
+            font-size: 16px;
+        }
+
+        .promotion-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 1001;
+        }
+
+        .promotion-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+        }
+
+        .promotion-pieces {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .promotion-piece {
+            font-size: 60px;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        .promotion-piece:hover {
+            background: #f0f0f0;
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>♟️ BotMate</h1>
+            <p>Advanced Chess Platform with ELO Rating System</p>
+        </div>
+
+        <div class="game-layout">
+            <div class="board-container">
+                <div class="chessboard" id="chessboard"></div>
+            </div>
+
+            <div class="sidebar">
+                <div class="mode-selector">
+                    <h3>Game Mode</h3>
+                    <div class="mode-buttons">
+                        <button class="mode-btn active" onclick="setMode('user-vs-bot')">👤 User vs Bot</button>
+                        <button class="mode-btn" onclick="setMode('user-vs-user')">👥 User vs User</button>
+                        <button class="mode-btn" onclick="setMode('bot-vs-bot')">🤖 Bot vs Bot</button>
+                    </div>
+                    <button class="reset-btn" onclick="resetGame()">🔄 New Game</button>
+                </div>
+
+                <div class="game-info">
+                    <div class="info-section">
+                        <h4>ELO Ratings</h4>
+                        <div class="elo-display">
+                            <div class="elo-item">
+                                <div class="elo-value" id="whiteElo">250</div>
+                                <div class="elo-label">White</div>
+                            </div>
+                            <div class="elo-item">
+                                <div class="elo-value" id="blackElo">500</div>
+                                <div class="elo-label">Black</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <h4>Game Status</h4>
+                        <p class="status" id="gameStatus">White to move</p>
+                        <p id="turnInfo">Mode: User vs Bot</p>
+                    </div>
+
+                    <div class="info-section">
+                        <h4>Move History</h4>
+                        <div class="move-history" id="moveHistory">Game started...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-over-modal" id="gameOverModal">
+        <div class="modal-content">
+            <h2 id="gameOverTitle">Game Over!</h2>
+            <p id="gameOverMessage"></p>
+            <p id="eloChange"></p>
+            <button class="mode-btn" style="margin-top: 20px;" onclick="closeModal()">Play Again</button>
+        </div>
+    </div>
+
+    <div class="promotion-modal" id="promotionModal">
+        <div class="promotion-content">
+            <h3>Choose Promotion Piece</h3>
+            <div class="promotion-pieces" id="promotionPieces"></div>
+        </div>
+    </div>
+
+    <script>
+        // Game State
+        let game = new Chess();
+        let selectedSquare = null;
+        let gameMode = 'user-vs-bot';
+        let playerColor = 'w';
+        
+        // ELO Ratings
+        let whiteElo = 250;
+        let blackElo = 500;
+        
+        // Piece Unicode symbols
+        const pieces = {
+            'wp': '♙', 'wn': '♘', 'wb': '♗', 'wr': '♖', 'wq': '♕', 'wk': '♔',
+            'bp': '♟', 'bn': '♞', 'bb': '♝', 'br': '♜', 'bq': '♛', 'bk': '♚'
+        };
+
+        // Initialize board
+        function initBoard() {
+            const board = document.getElementById('chessboard');
+            board.innerHTML = '';
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const square = document.createElement('div');
+                    const isLight = (row + col) % 2 === 0;
+                    square.className = `square ${isLight ? 'light' : 'dark'}`;
+                    
+                    const file = String.fromCharCode(97 + col);
+                    const rank = 8 - row;
+                    square.dataset.square = file + rank;
+                    
+                    square.addEventListener('click', () => handleSquareClick(file + rank));
+                    board.appendChild(square);
+                }
+            }
+            
+            updateBoard();
+            updateGameInfo();
+        }
+
+        // Update board display
+        function updateBoard() {
+            const board = game.board();
+            const squares = document.querySelectorAll('.square');
+            
+            squares.forEach(square => {
+                const pos = square.dataset.square;
+                const file = pos.charCodeAt(0) - 97;
+                const rank = 8 - parseInt(pos[1]);
+                
+                const piece = board[rank][file];
+                
+                if (piece) {
+                    const pieceCode = piece.color + piece.type;
+                    square.textContent = pieces[pieceCode];
+                    square.classList.add('has-piece');
+                } else {
+                    square.textContent = '';
+                    square.classList.remove('has-piece');
+                }
+            });
+        }
+
+        // Handle square clicks
+        function handleSquareClick(square) {
+            // Check if it's the player's turn
+            if (gameMode === 'user-vs-bot' && game.turn() !== playerColor) return;
+            if (gameMode === 'bot-vs-bot') return;
+            
+            const piece = game.get(square);
+            
+            if (selectedSquare) {
+                // Try to make a move
+                const moves = game.moves({ square: selectedSquare, verbose: true });
+                const move = moves.find(m => m.to === square);
+                
+                if (move) {
+                    // Check for pawn promotion
+                    if (move.flags.includes('p')) {
+                        showPromotionDialog(selectedSquare, square);
+                        return;
+                    }
+                    makeMove(selectedSquare, square);
+                } else if (piece && piece.color === game.turn()) {
+                    // Select new piece
+                    selectSquare(square);
+                } else {
+                    clearSelection();
+                }
+            } else if (piece && piece.color === game.turn()) {
+                selectSquare(square);
+            }
+        }
+
+        // Select a square
+        function selectSquare(square) {
+            clearSelection();
+            selectedSquare = square;
+            
+            const squareEl = document.querySelector(`[data-square="${square}"]`);
+            squareEl.classList.add('selected');
+            
+            // Show legal moves
+            const moves = game.moves({ square: square, verbose: true });
+            moves.forEach(move => {
+                const targetSquare = document.querySelector(`[data-square="${move.to}"]`);
+                targetSquare.classList.add('legal-move');
+                if (move.captured) {
+                    targetSquare.classList.add('has-piece');
+                }
+            });
+        }
+
+        // Clear selection
+        function clearSelection() {
+            selectedSquare = null;
+            document.querySelectorAll('.square').forEach(sq => {
+                sq.classList.remove('selected', 'legal-move', 'has-piece');
+            });
+        }
+
+        // Make a move
+        function makeMove(from, to, promotion = 'q') {
+            const move = game.move({ from, to, promotion });
+            
+            if (move) {
+                clearSelection();
+                updateBoard();
+                updateMoveHistory(move);
+                
+                if (game.game_over()) {
+                    handleGameOver();
+                } else {
+                    updateGameInfo();
+                    
+                    // Bot moves
+                    if (gameMode === 'user-vs-bot' && game.turn() !== playerColor) {
+                        setTimeout(makeBotMove, 500);
+                    } else if (gameMode === 'bot-vs-bot') {
+                        setTimeout(makeBotMove, 1000);
+                    }
+                }
+            }
+        }
+
+        // Bot AI - Simple minimax with alpha-beta pruning
+        function makeBotMove() {
+            document.getElementById('gameStatus').innerHTML = '<span class="thinking">🤔 Bot is thinking...</span>';
+            
+            setTimeout(() => {
+                const difficulty = gameMode === 'bot-vs-bot' ? 3 : 2;
+                const bestMove = findBestMove(difficulty);
+                
+                if (bestMove) {
+                    if (bestMove.flags.includes('p')) {
+                        game.move({ from: bestMove.from, to: bestMove.to, promotion: 'q' });
+                    } else {
+                        game.move({ from: bestMove.from, to: bestMove.to });
+                    }
+                    
+                    updateBoard();
+                    updateMoveHistory(bestMove);
+                    
+                    if (game.game_over()) {
+                        handleGameOver();
+                    } else {
+                        updateGameInfo();
+                        
+                        if (gameMode === 'bot-vs-bot') {
+                            setTimeout(makeBotMove, 1000);
+                        }
+                    }
+                }
+            }, 300);
+        }
+
+        // Simple evaluation function
+        function evaluateBoard() {
+            const pieceValues = {
+                'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000
+            };
+            
+            let score = 0;
+            const board = game.board();
+            
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const piece = board[i][j];
+                    if (piece) {
+                        const value = pieceValues[piece.type];
+                        score += piece.color === 'w' ? value : -value;
+                    }
+                }
+            }
+            
+            return score;
+        }
+
+        // Minimax algorithm
+        function minimax(depth, isMaximizing, alpha, beta) {
+            if (depth === 0 || game.game_over()) {
+                return evaluateBoard();
+            }
+            
+            const moves = game.moves({ verbose: true });
+            
+            if (isMaximizing) {
+                let maxEval = -Infinity;
+                for (let move of moves) {
+                    game.move(move);
+                    const eval = minimax(depth - 1, false, alpha, beta);
+                    game.undo();
+                    maxEval = Math.max(maxEval, eval);
+                    alpha = Math.max(alpha, eval);
+                    if (beta <= alpha) break;
+                }
+                return maxEval;
+            } else {
+                let minEval = Infinity;
+                for (let move of moves) {
+                    game.move(move);
+                    const eval = minimax(depth - 1, true, alpha, beta);
+                    game.undo();
+                    minEval = Math.min(minEval, eval);
+                    beta = Math.min(beta, eval);
+                    if (beta <= alpha) break;
+                }
+                return minEval;
+            }
+        }
+
+        // Find best move
+        function findBestMove(depth) {
+            const moves = game.moves({ verbose: true });
+            let bestMove = null;
+            let bestValue = game.turn() === 'w' ? -Infinity : Infinity;
+            
+            for (let move of moves) {
+                game.move(move);
+                const value = minimax(depth - 1, game.turn() === 'w', -Infinity, Infinity);
+                game.undo();
+                
+                if (game.turn() === 'w' && value > bestValue) {
+                    bestValue = value;
+                    bestMove = move;
+                } else if (game.turn() === 'b' && value < bestValue) {
+                    bestValue = value;
+                    bestMove = move;
+                }
+            }
+            
+            return bestMove;
+        }
+
+        // Show promotion dialog
+        function showPromotionDialog(from, to) {
+            const modal = document.getElementById('promotionModal');
+            const piecesDiv = document.getElementById('promotionPieces');
+            const color = game.turn();
+            
+            piecesDiv.innerHTML = '';
+            const promotionPieces = ['q', 'r', 'b', 'n'];
+            
+            promotionPieces.forEach(piece => {
+                const div = document.createElement('div');
+                div.className = 'promotion-piece';
+                div.textContent = pieces[color + piece];
+                div.onclick = () => {
+                    modal.style.display = 'none';
+                    makeMove(from, to, piece);
+                };
+                piecesDiv.appendChild(div);
+            });
+            
+            modal.style.display = 'flex';
+        }
+
+        // Update game info
+        function updateGameInfo() {
+            const turn = game.turn() === 'w' ? 'White' : 'Black';
+            document.getElementById('gameStatus').textContent = `${turn} to move`;
+            
+            let modeText = '';
+            if (gameMode === 'user-vs-bot') {
+                modeText = `Mode: User vs Bot (You are ${playerColor === 'w' ? 'White' : 'Black'})`;
+            } else if (gameMode === 'user-vs-user') {
+                modeText = 'Mode: User vs User';
+            } else {
+                modeText = 'Mode: Bot vs Bot';
+            }
+            document.getElementById('turnInfo').textContent = modeText;
+        }
+
+        // Update move history
+        function updateMoveHistory(move) {
+            const historyDiv = document.getElementById('moveHistory');
+            const moveText = `${move.color === 'w' ? 'White' : 'Black'}: ${move.from}-${move.to}${move.captured ? ' (capture)' : ''}`;
+            historyDiv.innerHTML += `<br>${moveText}`;
+            historyDiv.scrollTop = historyDiv.scrollHeight;
+        }
+
+        // Calculate ELO change
+        function calculateEloChange(winnerElo, loserElo) {
+            const K = 32;
+            const expectedWin = 1 / (1 + Math.pow(10, (loserElo - winnerElo) / 400));
+            return Math.round(K * (1 - expectedWin));
+        }
+
+        // Handle game over
+        function handleGameOver() {
+            let winner = null;
+            let result = '';
+            
+            if (game.in_checkmate()) {
+                winner = game.turn() === 'w' ? 'black' : 'white';
+                result = `Checkmate! ${winner.charAt(0).toUpperCase() + winner.slice(1)} wins!`;
+            } else if (game.in_draw()) {
+                result = 'Draw!';
+            } else if (game.in_stalemate()) {
+                result = 'Stalemate!';
+            } else if (game.in_threefold_repetition()) {
+                result = 'Draw by threefold repetition!';
+            } else if (game.insufficient_material()) {
+                result = 'Draw by insufficient material!';
+            }
+            
+            document.getElementById('gameStatus').textContent = result;
+            
+            // Update ELO
+            let eloChangeText = '';
+            if (winner) {
+                const eloChange = calculateEloChange(
+                    winner === 'white' ? whiteElo : blackElo,
+                    winner === 'white' ? blackElo : whiteElo
+                );
+                
+                if (winner === 'white') {
+                    whiteElo += eloChange;
+                    blackElo -= eloChange;
+                } else {
+                    blackElo += eloChange;
+                    whiteElo -= eloChange;
+                }
+                
+                eloChangeText = `ELO Change: ±${eloChange} points`;
+            } else {
+                eloChangeText = 'No ELO change (Draw)';
+            }
+            
+            document.getElementById('whiteElo').textContent = whiteElo;
+            document.getElementById('blackElo').textContent = blackElo;
+            
+            // Show modal
+            document.getElementById('gameOverTitle').textContent = result;
+            document.getElementById('gameOverMessage').textContent = `White: ${whiteElo} | Black: ${blackElo}`;
+            document.getElementById('eloChange').textContent = eloChangeText;
+            document.getElementById('gameOverModal').style.display = 'flex';
+        }
+
+        // Set game mode
+        function setMode(mode) {
+            gameMode = mode;
+            
+            // Update button states
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            resetGame();
+        }
+
+        // Reset game
+        function resetGame() {
+            game = new Chess();
+            selectedSquare = null;
+            
+            if (gameMode === 'user-vs-bot') {
+                playerColor = 'w';
+                whiteElo = 250;
+                blackElo = 500;
+            } else if (gameMode === 'user-vs-user') {
+                whiteElo = 250;
+                blackElo = 250;
+            } else {
+                whiteElo = 500;
+                blackElo = 500;
+            }
+            
+            document.getElementById('whiteElo').textContent = whiteElo;
+            document.getElementById('blackElo').textContent = blackElo;
+            document.getElementById('moveHistory').innerHTML = 'Game started...';
+            
+            initBoard();
+            
+            if (gameMode === 'bot-vs-bot') {
+                setTimeout(makeBotMove, 1000);
+            }
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('gameOverModal').style.display = 'none';
+            resetGame();
+        }
+
+        // Initialize game
+        initBoard();
+    </script>
+</body>
+</html>
